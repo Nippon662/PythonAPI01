@@ -23,13 +23,12 @@ items = [
 ]
 
 def get_all():
-    var_json = json.dumps(items, indent=2)
-    print(var_json)
+    return json.dumps(items, indent=2)
 
-#get_all()
+#print(get_all())
 
 def get_one(id):
-    var_json_id = json.dumps(items[id], indent=2)
-    print(var_json_id)
+    return json.dumps(items[id], indent=2)
+    
 
-get_one(1)
+print(get_one(2))
