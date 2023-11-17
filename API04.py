@@ -38,7 +38,7 @@ def get_owner_all():
     
 #     for res_owner in data_owner:
 #         res.append(dict(res_owner))
-#     return res
+#     return res000000000000000
 
 
 os.system('cls')
