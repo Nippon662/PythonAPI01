@@ -359,7 +359,7 @@ def owner_and_id(id):
 
 
 
-@app.route("/owners/search/<query>", methods=["GET"])
+@app.route("/items/search/<query>", methods=["GET"])
 def get_search(query):
     try:
         conn = sqlite3.connect(database)
