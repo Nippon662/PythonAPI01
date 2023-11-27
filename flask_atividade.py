@@ -326,7 +326,7 @@ def owner_and_id(id):
             SELECT item.*, owner.* 
             FROM item 
             INNER JOIN owner ON item.item_owner = owner.owner_id 
-            WHERE item.item_owner = ?
+            WHERE item.item_id = ?
         """, (id,))
 
         # Fetch all rows
