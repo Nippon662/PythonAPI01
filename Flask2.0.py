@@ -31,6 +31,279 @@ def prefix_remove(prefix, data):
     return new_data
 
 
+@app.route("/items", methods=["GET"])
+def get_all():
+
+    # Obtém todos os registros válidos de 'item'.
+    # Request method → GET
+    # Request endpoint → /items
+    # Response → JSON
+
+    try:
+
+        # Conecta ao banco de dados.
+        conn = sqlite3.connect(database)
+
+        # Formata os dados retornados na factory como SQLite.Row.
+        conn.row_factory = sqlite3.Row
+
+        # Cria um cursor de dados.
+        cursor = conn.cursor()
+
+        # Executa o SQL.
+        cursor.execute(
+            "SELECT * FROM item WHERE item_status = 'on' ORDER BY item_date DESC")
+
+        # Retorna todos os resultados da consulta para 'items_rows'.
+        items_rows = cursor.fetchall()
+
+        # Fecha a conexão com o banco de dados
+        conn.close()
+
+        # Cria uma lista para armazenar os registros.
+        items = []
+
+        # Converte cada SQLite.Row em um dicionário e adiciona à lista 'registros'.
+        for item in items_rows:
+            items.append(dict(item))
+
+        # Verifica se há registros antes de retornar...
+        if items:
+
+            # Remove prefixos dos campos.
+            new_items = [prefix_remove('item_', item) for item in items]
+
+            # Se houver registros, retorna tudo.
+            return new_items, 200
+        else:
+            # Se não houver registros, retorna erro.
+            return {"error": "Nenhum item encontrado"}, 404
+
+    except sqlite3.Error as e:  # Erro ao processar banco de dados.
+        return {"error": f"Erro ao acessar o banco de dados: {str(e)}"}, 500
+
+    except Exception as error:  # Outros erros.
+        return {"error": f"Erro inesperado: {str(error)}"}, 500
+
+
+@app.route("/items/<int:id>", methods=["GET"])
+def get_one(id):
+
+    # Obtém um registro único de 'item', identificado pelo 'id'.
+    # Request method → GET
+    # Request endpoint → /items/<id>
+    # Response → JSON
+
+    try:
+        # Conecta ao banco de dados.
+        conn = sqlite3.connect(database)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Executa o SQL.
+        cursor.execute(
+            "SELECT * FROM item WHERE item_id = ? AND item_status = 'on'", (id,))
+
+        # Retorna o resultado da consulta para 'item_row'.
+        item_row = cursor.fetchone()
+
+        # Fecha a conexão com o banco de dados.
+        conn.close()
+
+        # Se o registro existe...
+        if item_row:
+
+            # Converte SQLite.Row para dicionário e armazena em 'item'.
+            item = dict(item_row)
+
+            # Remove prefixos dos campos.
+            new_item = prefix_remove('item_', item)
+
+            # Retorna item.
+            return new_item, 200
+        else:
+            # Se não encontrar o registro, retorna erro.
+            return {"error": "Item não encontrado"}, 404
+
+    except sqlite3.Error as e:  # Erro ao processar banco de dados.
+        return {"error": f"Erro ao acessar o banco de dados: {str(e)}"}, 500
+
+    except Exception as error:  # Outros erros.
+        return {"error": f"Erro inesperado: {str(error)}"}, 500
+
+
+@app.route('/items', methods=["POST"])
+def create():
+
+    # Cadastra um novo registro em 'item'.
+    # Request method → POST
+    # Request endpoint → /items
+    # Request body → JSON (raw) → { String:name, String:description, String:location, int:owner }
+    # Response → JSON → { "success": "Registro criado com sucesso", "id": id do novo registro }}
+
+    try:
+        # Recebe dados do body da requisição na forma de 'dict'.
+        new_item = request.get_json()
+
+        # Conecta ao banco de dados.
+        # Observe que 'row_factory' é desnecessário porque não receberemos dados do banco de dados.
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()
+
+        # Query que insere um novo registro na tabela 'item'.
+        sql = "INSERT INTO item (item_name, item_description, item_location, item_owner) VALUES (?, ?, ?, ?)"
+
+        # Dados a serem inseridos, obtidos do request.
+        sql_data = (
+            new_item['name'],
+            new_item['description'],
+            new_item['location'],
+            new_item['owner']
+        )
+
+        # Executa a query, fazendo as devidas substituições dos curingas (?) pelos dados (sql_data).
+        cursor.execute(sql, sql_data)
+
+        # Obter o ID da última inserção
+        inserted_id = int(cursor.lastrowid)
+
+        # Salvar as alterações no banco de dados.
+        conn.commit()
+
+        # Fecha a conexão com o banco de dados.
+        conn.close()
+
+        # Retorna com mensagem de sucesso e status HTTP "201 Created".
+        return {"success": "Registro criado com sucesso", "id": inserted_id}, 201
+
+    except json.JSONDecodeError as e:  # Erro ao obter dados do JSON.
+        return {"error": f"Erro ao decodificar JSON: {str(e)}"}, 500
+
+    except sqlite3.Error as e:  # Erro ao processar banco de dados.
+        return {"error": f"Erro ao acessar o banco de dados: {str(e)}"}, 500
+
+    except Exception as error:  # Outros erros.
+        return {"error": f"Erro inesperado: {str(error)}"}, 500
+
+
+@app.route("/items/<int:id>", methods=["PUT", "PATCH"])
+def edit(id):
+
+    # Edita um registro em 'item', identificado pelo 'id'.
+    # Request method → PUT ou PATCH
+    # Request endpoint → /items/<id>
+    # Request body → JSON (raw) → { String:name, String:description, String:location, int:owner }
+    #       OBS: usando "PATCH", não é necessário enviar todos os campos, apenas os que serão alterados.
+    # Response → JSON → { "success": "Registro atualizado com sucesso", "id": id do registro }
+    try:
+        # Recebe os dados do corpo da requisição.
+        item_json = request.get_json()
+        
+        # Conecta ao banco de dados.
+        conn = sqlite3.connect(database)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Query ára atualizar o banco de dados.
+        # Query que pesquisa a existência do registro.
+        sql = "SELECT item_id FROM item WHERE item_id = ? AND item_status != 'off'"
+        
+        # Executa a query.
+        cursor.execute(sql, (id,))
+        
+        # Retorna o resultado da consulta para 'item_row'.
+        item_row = cursor.fetchone()
+        
+        
+        if item_row:
+            
+            # Loop para atualizar os campos específicos do registro na tabela 'item'.
+            # Observe que o prefixo 'item_' é adicionado ao(s) nome(s) do(s) campo(s).
+            set_clause = ', '.join([f"item_{key} = ?" for key in item_json.keys()])
+
+            # Monta SQL com base nos campos a serem atualizados.
+            sql = f"UPDATE item SET {set_clause} WHERE item_id = ? AND item_status = 'on'"
+            cursor.execute(sql, (*item_json.values(), id))
+        # Commit para salvar as alterações.
+            conn.commit()
+
+            # Fechar a conexão com o banco de dados.
+            conn.close()
+
+            #    Retorna com mensagem de sucesso e status HTTP "200 Ok".
+            return {"success": "Registro atualizado com sucesso", "id": id}, 200
+        else:
+            # fecha o banco de dados.
+            conn.close()
+            
+            # Se não encontrar o registro, retorna erro.
+            return {"error": "Item não encontrado"}, 404
+        
+    except json.JSONDecodeError as e:  # Erro ao obter dados do JSON.
+        return {"error": f"Erro ao decodificar JSON: {str(e)}"}, 500
+    
+    except sqlite3.Error as e:  # Erro ao processar banco de dados.
+        return {"error": f"Erro ao acessar o banco de dados: {str(e)}"}, 500
+
+    except Exception as e:  # Outros erros.
+        return {"error": f"Erro inesperado: {str(e)}"}, 500
+
+
+@app.route("/items/<int:id>", methods=["DELETE"])
+def delete(id):
+
+    # Marca, como apagado, um registro único de 'item', identificado pelo 'id'.
+    # Request method → DELETE
+    # Request endpoint → /items/<id>
+    # Response → JSON → { "success": "Registro apagado com sucesso", "id": id do registro }
+
+    try: 
+        # Conecta ao banco de dados.
+        # Observe que 'row_factory' é desnecessário porque não receberemos dados do banco de dados.
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()
+        conn.row_factory = sqlite3.Row
+        
+        # Query ára atualizar o banco de dados.
+        # Query que pesquisa a existência do registro.
+        sql = "SELECT item_id FROM item WHERE item_id = ? AND item_status != 'off'"
+        
+        # Executa a query.
+        cursor.execute(sql, (id,))
+        
+        # Retorna o resultado da consulta para 'item_row'.
+        item_row = cursor.fetchone()
+
+
+        if item_row:
+            
+            sql = "UPDATE item SET item_status = 'off' WHERE item_id = ?"
+
+            # executa a Query.
+            cursor.execute(sql, (id,))
+            # Salvar no banco de dados.
+            conn.commit()
+        
+            # fechar banco de dados.
+            conn.close()
+
+            #    Retorna com mensagem de sucesso e status HTTP "200 Ok".
+            return {"success": "Registro apagado com sucesso", "id": id}, 200
+        else:
+            # fecha o banco de dados.
+            conn.close()
+            
+            # Se não encontrar o registro, retorna erro.
+            return {"error": "Item não encontrado"}, 404
+        
+
+    
+    except sqlite3.Error as e:  # Erro ao processar banco de dados.
+        return {"error": f"Erro ao acessar o banco de dados: {str(e)}"}, 500
+
+    except Exception as error:  # Outros erros.
+        return {"error": f"Erro inesperado: {str(error)}"}, 500
+
 @app.route("/owners", methods=["GET"])
 def get_owner_all():
     try:
@@ -396,7 +669,6 @@ def get_search(query):
     except Exception as error:  # Outros erros.
         return {"error": f"Erro inesperado: {str(error)}"}, 500
 
+# Roda aplicativo Flask.
 if __name__ == "__main__":
     app.run(debug=True)
-
-
