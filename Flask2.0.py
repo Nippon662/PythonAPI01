@@ -669,6 +669,42 @@ def get_search(query):
     except Exception as error:  # Outros erros.
         return {"error": f"Erro inesperado: {str(error)}"}, 500
 
+@app.route("/contacts", methods=["POST"])
+def contacts():
+
+    # Cadastra um novo contato em 'contact'.
+    # Request method → POST
+    # Request endpoint → /contacts
+    # Request body → JSON (raw) → { string:name, string:email, string:subject, string:message }
+    # Response → JSON → { "success": "Registro criado com sucesso", "id": id do novo registro }
+
+    try:
+        new_item = request.get_json()
+        conn = sqlite3.connect(database)
+        cursor = conn.cursor()
+        sql = "INSERT INTO contact (name, email, subject, message) VALUES (?, ?, ?, ?)"
+        sql_data = (
+            new_item['name'],
+            new_item['email'],
+            new_item['subject'],
+            new_item['message']
+        )
+        cursor.execute(sql, sql_data)
+        inserted_id = int(cursor.lastrowid)
+        conn.commit()
+        conn.close()
+
+        if inserted_id > 0:
+            return {"success": "Contato enviado com sucesso", "id": inserted_id, "name": new_item['name']}, 201
+
+    except json.JSONDecodeError as e:
+        return {"error": f"Erro ao decodificar JSON: {str(e)}"}, 500
+    except sqlite3.Error as e:
+        return {"error": f"Erro ao acessar o banco de dados: {str(e)}"}, 500
+    except Exception as e:
+        return {"error": f"Erro inesperado: {str(e)}"}, 500
+
+
 # Roda aplicativo Flask.
 if __name__ == "__main__":
     app.run(debug=True)
