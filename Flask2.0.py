@@ -250,7 +250,7 @@ def edit(id):
 
 
 @app.route("/items/<int:id>", methods=["DELETE"])
-def delete(id):
+def delete_items(id):
 
     # Marca, como apagado, um registro único de 'item', identificado pelo 'id'.
     # Request method → DELETE
@@ -429,7 +429,7 @@ def create_new_owner():
         return {"error": f"Erro inesperado: {str(error)}"}, 500
 
 @app.route("/owners/<int:id>", methods=["PUT", "PATCH"])
-def edit(id):
+def edit_owners(id):
 
     # Edita um registro em 'item', identificado pelo 'id'.
     # Request method → PUT ou PATCH
